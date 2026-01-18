@@ -15,6 +15,9 @@ $routes->group('auth', ['filter' => 'csrf'], function($routes) {
     $routes->post('processRegister', 'Auth::processRegister');
     $routes->get('logout', 'Auth::logout');
     
+    // Email Verification
+    $routes->get('verify/(:any)', 'Auth::verifyEmail/$1');
+    
     // Forgot Password
     $routes->get('forgot', 'Auth::forgotPassword');
     $routes->post('sendResetLink', 'Auth::sendResetLink');

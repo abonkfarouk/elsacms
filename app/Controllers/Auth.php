@@ -5,10 +5,7 @@ namespace App\Controllers;
 use App\Controllers\BaseController;
 use App\Models\UserModel;
 use CodeIgniter\HTTP\ResponseInterface;
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-use PHPMailer\PHPMailer\OAuth;
-use League\OAuth2\Client\Provider\Google;
+use App\Libraries\Mailer;
 
 class Auth extends BaseController
 {
@@ -127,22 +124,66 @@ class Auth extends BaseController
                 ->with('errors', $validation->getErrors());
         }
 
+        // Generate Activation Token
+        $activationToken = bin2hex(random_bytes(32));
+
         $data = [
             'username'  => $this->request->getPost('username'),
             'email'     => $this->request->getPost('email'),
             'password'  => $this->request->getPost('password'),
             'full_name' => $this->request->getPost('full_name') ?? '',
-            'is_active' => 1,
+            'is_active' => 0, // Inactive by default
+            'activation_token' => $activationToken
         ];
 
         if ($this->userModel->insert($data)) {
-            return redirect()->to('/auth/login')
-                ->with('success', 'Registrasi berhasil! Silakan login.');
+            // Send Verification Email
+            $verifyLink = base_url("auth/verify/$activationToken");
+            $mailer = new Mailer();
+            $subject = 'Verifikasi Akun ElsaCMS';
+            $message = "
+                <h3>Verifikasi Akun</h3>
+                <p>Halo " . esc($data['full_name']) . ",</p>
+                <p>Terima kasih telah mendaftar. Silakan klik link di bawah ini untuk mengaktifkan akun Anda:</p>
+                <p><a href='$verifyLink' style='background:#0C7779;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;'>Verifikasi Email</a></p>
+                <p>Atau copy link ini: <br> $verifyLink</p>
+            ";
+
+            if ($mailer->send($data['email'], $subject, $message)) {
+                return redirect()->to('/auth/login')
+                    ->with('success', 'Registrasi berhasil! Silakan cek email untuk verifikasi akun Anda.');
+            } else {
+                return redirect()->to('/auth/login')
+                    ->with('warning', 'Registrasi berhasil, namun gagal mengirim email verifikasi. Silakan hubungi admin.');
+            }
         } else {
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'Gagal melakukan registrasi. Silakan coba lagi.');
         }
+    }
+
+    /**
+     * Verify Email
+     */
+    public function verifyEmail($token = null)
+    {
+        if (!$token) {
+            return redirect()->to('/auth/login')->with('error', 'Token tidak valid.');
+        }
+
+        $user = $this->userModel->where('activation_token', $token)->first();
+
+        if (!$user) {
+            return redirect()->to('/auth/login')->with('error', 'Token verifikasi tidak valid atau akun sudah aktif.');
+        }
+
+        $this->userModel->update($user['id'], [
+            'is_active' => 1,
+            'activation_token' => null
+        ]);
+
+        return redirect()->to('/auth/login')->with('success', 'Akun berhasil diverifikasi! Silakan login.');
     }
 
     /**
@@ -203,88 +244,18 @@ class Auth extends BaseController
         // LOG IT (Critical for testing without SMTP)
         log_message('critical', "RESET PASSWORD LINK for $email: $resetLink");
 
-        // Attempt Email with PHPMailer
-        $sent = false;
-        try {
-            // Start PHPMailer
-            $mail = new PHPMailer(true);
-            $mail->isSMTP();
-            
-            // Check for Google OAuth2
-            $clientId = env('GOOGLE_CLIENT_ID');
-            $clientSecret = env('GOOGLE_CLIENT_SECRET');
-            $refreshToken = env('GOOGLE_REFRESH_TOKEN');
-            $googleEmail = env('GOOGLE_EMAIL');
+        // Send Email
+        $mailer = new Mailer();
+        $sent = $mailer->send($email, 'Reset Password Permintaan', "
+            <h3>Reset Password</h3>
+            <p>Halo,</p>
+            <p>Silakan klik link berikut untuk mereset password akun Anda:</p>
+            <p><a href='$resetLink' style='background:#0C7779;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;'>Reset Password</a></p>
+            <p>Link berlaku 1 jam.</p>
+        ");
 
-            if ($clientId && $clientSecret && $refreshToken) {
-                log_message('critical', 'Auth: Attempting Google XOAUTH2');
-                
-                $mail->Host = 'smtp.gmail.com'; // Force correct host for OAuth
-                $mail->Port = 465;
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-                $mail->SMTPAuth = true;
-                $mail->AuthType = 'XOAUTH2';
-                
-                $provider = new Google([
-                    'clientId'     => $clientId,
-                    'clientSecret' => $clientSecret,
-                ]);
-                
-                $mail->setOAuth(
-                    new OAuth([
-                        'provider'     => $provider,
-                        'clientId'     => $clientId,
-                        'clientSecret' => $clientSecret,
-                        'refreshToken' => $refreshToken,
-                        'userName'     => $googleEmail,
-                    ])
-                );
-            } else {
-                log_message('critical', 'Auth: Attempting Standard SMTP');
-                // Standard Auth
-                $mail->Host       = env('SMTP_HOST');
-                $mail->Port       = env('SMTP_PORT') ?: 465;
-                $mail->SMTPSecure = env('SMTP_SECURE') ?: PHPMailer::ENCRYPTION_SMTPS;
-                $mail->SMTPAuth   = true; // Ensure this is true
-                $mail->Username   = env('SMTP_USER');
-                $mail->Password   = env('SMTP_PASS');
-            }
-
-
-
-            // Recipients
-            $fromName = env('SMTP_FROM_NAME') ?: (function_exists('site_name') ? site_name() : 'ElsaCMS');
-            
-            // Note: For Gmail SMTP, 'From' must be the same as authenticated user or a verified alias.
-            // Using random 'no-reply@elsacms.com' will fail with 5.7.0 Authentication Required if not an alias.
-            if ($clientId && $clientSecret && $refreshToken) {
-                 $mail->setFrom($googleEmail, $fromName);
-            } else {
-                 //$mail->setFrom($fromEmail, $fromName); // This might fail for Standard Gmail too if not alias. 
-                 // Safest is to use the SMTP_USER.
-                 $mail->setFrom(env('SMTP_USER'), $fromName);
-            }
-            
-            $mail->addAddress($email);
-
-            // Content
-            $mail->isHTML(true);
-            $mail->Subject = 'Reset Password Permintaan';
-            $mail->Body    = "
-                <h3>Reset Password</h3>
-                <p>Halo,</p>
-                <p>Silakan klik link berikut untuk mereset password akun Anda:</p>
-                <p><a href='$resetLink' style='background:#0C7779;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;'>Reset Password</a></p>
-                <p>Atau copy link ini: <br> $resetLink</p>
-                <p>Link ini berlaku selama 1 jam.</p>
-                <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
-            ";
-            $mail->AltBody = "Halo,\n\nSilakan klik link berikut untuk mereset password akun Anda:\n\n$resetLink\n\nLink ini berlaku selama 1 jam.";
-
-            $mail->send();
-            $sent = true;
-        } catch (Exception $e) {
-            log_message('error', "PHPMailer Error: {$mail->ErrorInfo}");
+        if (!$sent) {
+            log_message('error', "Failed to send reset link to $email");
         }
 
         return redirect()->back()->with('success', 'Link reset password telah dikirim ke email Anda! (Cek Log/Spam)');
