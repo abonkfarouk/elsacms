@@ -69,6 +69,31 @@ ElsaCMS is a modern, lightweight, and secure Content Management System built wit
    php spark serve
    ```
 
+
+## Google SMTP & Debugging 📧
+
+This project includes built-in tools to help you verify SMTP status and generate OAuth2 Refresh Tokens.
+
+### 1. Generating Refresh Token (Google OAuth2)
+If you use Google OAuth2 for sending emails, you need a Refresh Token. Run the helper script:
+
+```bash
+php get_oauth_token.php
+```
+Follow the on-screen instructions:
+1.  Enter your `Client ID` and `Client Secret`.
+2.  Open the generate URL in your browser.
+3.  Login and copy the `Authorization Code`.
+4.  Paste the code back into the terminal to get your `REFRESH_TOKEN`.
+
+### 2. Testing SMTP Connection
+To verify if your SMTP configuration (in `.env`) is correct without using the web UI, run:
+
+```bash
+php test_smtp.php
+```
+This will attempt to send a test email to your configured Google Email and display the connection log.
+
 ## Login 🔑
 
 Access the admin dashboard at `http://localhost:8080/login`.
