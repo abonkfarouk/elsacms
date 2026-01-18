@@ -178,6 +178,10 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
+            
+            <div style="text-align: right; margin-bottom: 20px; margin-top: -15px;">
+                <a href="<?= base_url('auth/forgot') ?>" style="color: #0C7779; font-size: 13px; text-decoration: none; font-weight: 500;">Lupa Password?</a>
+            </div>
 
             <button type="submit" class="btn">Login</button>
         </form>

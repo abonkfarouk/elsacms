@@ -7,10 +7,11 @@ ElsaCMS is a modern, lightweight, and secure Content Management System built wit
 - **Modern Dashboard**: A clean, responsive admin interface for managing your site.
 - **Blog System**: Full-featured blog with categories, featured images, and rich text editor (Quill).
 - **Related Posts**: Automatically displays relevant articles to better engage readers.
-- **User Management**: Secure authentication with Role-Based Access Control (RBAC). Manage Users, Roles, and Permissions.
+- **User Management**: Secure authentication with Role-Based Access Control (RBAC) and **Password Recovery** (Forgot Password).
 - **Dynamic Settings**: Customize site identity, logo, hero section, and social media links directly from the admin panel.
 - **SEO & Social Ready**: Built-in Open Graph (OG) tags and Twitter Cards for beautiful social media previews.
 - **Mobile Optimized**: Fully responsive frontend and backend design.
+- **Email System**: Integrated **PHPMailer** for reliable verify/reset emails via SMTP.
 
 ## Requirements 📋
 
@@ -37,15 +38,23 @@ ElsaCMS is a modern, lightweight, and secure Content Management System built wit
    ```bash
    cp env .env
    ```
-   Open `.env` and configure your database settings:
+   Open `.env` and configure your database and SMTP settings:
    ```ini
    CI_ENVIRONMENT = development
    
+   # Database
    database.default.hostname = localhost
    database.default.database = elsacms
    database.default.username = root
    database.default.password = 
    database.default.DBDriver = MySQLi
+
+   # SMTP (Email)
+   SMTP_HOST = smtp.gmail.com
+   SMTP_PORT = 465
+   SMTP_USER = your_email@gmail.com
+   SMTP_PASS = your_app_password
+   SMTP_SECURE = ssl
    ```
 
 4. **Run Migrations & Seeds**

@@ -14,6 +14,12 @@ $routes->group('auth', ['filter' => 'csrf'], function($routes) {
     $routes->get('register', 'Auth::register');
     $routes->post('processRegister', 'Auth::processRegister');
     $routes->get('logout', 'Auth::logout');
+    
+    // Forgot Password
+    $routes->get('forgot', 'Auth::forgotPassword');
+    $routes->post('sendResetLink', 'Auth::sendResetLink');
+    $routes->get('resetPassword/(:any)', 'Auth::resetPassword/$1');
+    $routes->post('updatePassword', 'Auth::updatePassword');
 });
 
 // Dashboard Routes (Protected by auth filter)
